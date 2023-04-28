@@ -1,4 +1,4 @@
-module github.com/d4l3k/go-csp-engine
+module github.com/gmsec26/go-csp-engine
 
 go 1.11
 
