@@ -21,10 +21,11 @@ func ParsePolicy(policy string) (Policy, error) {
 		Directives: map[string]Directive{},
 	}
 	directiveDefs := strings.Split(policy, ";")
-	for _, directive := range directiveDefs {
+	for _, rawdirective := range directiveDefs {
+		directive := strings.TrimSpace(rawdirective)
 		fields := strings.Fields(directive)
 		if len(fields) == 0 {
-			return Policy{}, errors.Errorf("empty directive field")
+			continue // do not fatally fail on an empty directive, e.g. object-src;
 		}
 		directiveType := fields[0]
 		switch directiveType {
