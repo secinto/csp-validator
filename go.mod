@@ -1,6 +1,6 @@
-module github.com/d4l3k/go-csp-engine
+module github.com/danslo/go-csp-engine
 
-go 1.11
+go 1.12
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.0
