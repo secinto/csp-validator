@@ -44,9 +44,7 @@ func ParsePolicy(policy string) (Policy, error) {
 			}
 
 		case "report-to":
-			if len(fields) != 2 {
-				return Policy{}, errors.Errorf("report-to expects 1 field; got %q", directive)
-			}
+			continue
 
 		case "upgrade-insecure-requests":
 			if len(fields) != 1 {
