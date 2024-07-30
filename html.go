@@ -1,7 +1,9 @@
 package csp
 
 import (
+	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -129,4 +131,33 @@ func ValidatePage(p Policy, page url.URL, html io.Reader) (bool, []Report, error
 	}
 
 	return len(reports) == 0, reports, nil
+}
+
+// retrieves the current CSP setting from a web page
+func GetCSPFromWeb(webaddress string) (string, string) {
+	// create an http client object
+	client := &http.Client{}
+
+	// create a new GET request
+	req, err := http.NewRequest("GET", webaddress, nil)
+	if err != nil {
+		return "", fmt.Sprintf("Error creating request: %s", err)
+	}
+
+	// make the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Sprintf("Error making request: %s", err)
+	}
+
+	// read the response body
+	// body, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	fmt.Println("Error reading response: ", err)
+	// 	return
+	// }
+
+	// print the response body
+	//fmt.Println(string(body))
+	return resp.Header.Get("content-security-policy"), ""
 }

@@ -30,7 +30,7 @@ import (
 	"strings"
   "log"
 
-	csp "github.com/d4l3k/go-csp-engine"
+	csp "github.com/secinto/go-csp-engine"
 )
 
 func main() {

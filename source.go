@@ -74,6 +74,7 @@ type SourceDirective struct {
 	Self         bool
 	Schemes      map[string]bool
 	Hosts        []glob.Glob
+	SrcHosts     []string
 }
 
 func urlSchemeHost(u url.URL) string {
@@ -212,6 +213,7 @@ func (s *SourceDirective) ParseSource(source string) error {
 					return err
 				}
 				s.Hosts = append(s.Hosts, g)
+				s.SrcHosts = append(s.SrcHosts, source)
 			}
 			{
 				g, err := glob.Compile("*://"+sanitizeGlob(source), '/')
