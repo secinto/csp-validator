@@ -1,4 +1,4 @@
-# go-csp-engine [![GoDoc](https://godoc.org/github.com/d4l3k/go-csp-engine?status.svg)](https://godoc.org/github.com/d4l3k/go-csp-engine) [![Build Status](https://travis-ci.com/d4l3k/go-csp-engine.svg?branch=master)](https://travis-ci.com/d4l3k/go-csp-engine)
+# go-csp-engine [![GoDoc](https://godoc.org/github.com/secinto/go-csp-engine?status.svg)](https://godoc.org/github.com/secinto/go-csp-engine) [![Build Status](https://travis-ci.com/d4l3k/go-csp-engine.svg?branch=master)](https://travis-ci.com/d4l3k/go-csp-engine)
 
 Content Security Policy engine for Go/Golang. Unit test your CSP rules!
 
@@ -30,7 +30,7 @@ import (
 	"strings"
   "log"
 
-	csp "github.com/d4l3k/csp-validator"
+	csp "github.com/secinto/go-csp-engine"
 )
 
 func main() {
