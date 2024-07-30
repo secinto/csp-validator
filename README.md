@@ -1,4 +1,4 @@
-# go-csp-engine [![GoDoc](https://godoc.org/github.com/d4l3k/go-csp-engine?status.svg)](https://godoc.org/github.com/d4l3k/go-csp-engine) [![Build Status](https://travis-ci.com/d4l3k/go-csp-engine.svg?branch=master)](https://travis-ci.com/d4l3k/go-csp-engine)
+# go-csp-engine 
 
 Content Security Policy engine for Go/Golang. Unit test your CSP rules!
 
