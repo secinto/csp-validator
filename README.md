@@ -30,7 +30,7 @@ import (
 	"strings"
   "log"
 
-	csp "github.com/d4l3k/go-csp-engine"
+	csp "github.com/d4l3k/csp-validator"
 )
 
 func main() {
