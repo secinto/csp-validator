@@ -1,4 +1,4 @@
-package csp
+package validate
 
 import (
 	"net/url"

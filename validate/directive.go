@@ -1,4 +1,4 @@
-package csp
+package validate
 
 // Directive is a rule for a CSP directive.
 type Directive interface {

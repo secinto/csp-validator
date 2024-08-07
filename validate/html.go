@@ -1,13 +1,16 @@
-package csp
+package validate
 
 import (
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/antchfx/htmlquery"
+	"github.com/pkg/errors"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/PuerkitoBio/goquery"
+	"time"
 )
 
 var (
@@ -134,30 +137,63 @@ func ValidatePage(p Policy, page url.URL, html io.Reader) (bool, []Report, error
 }
 
 // retrieves the current CSP setting from a web page
-func GetCSPFromWeb(webaddress string) (string, string) {
-	// create an http client object
-	client := &http.Client{}
+func GetCSPFromWeb(webaddress string) (string, string, *url.URL, error) {
+	// create a http client object
+	client := &http.Client{Timeout: 5 * time.Second}
 
 	// create a new GET request
 	req, err := http.NewRequest("GET", webaddress, nil)
 	if err != nil {
-		return "", fmt.Sprintf("Error creating request: %s", err)
+		return "", "", nil, errors.New(fmt.Sprintf("Error creating request: %s", err))
 	}
 
 	// make the request
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Sprintf("Error making request: %s", err)
+		return "", "", nil, errors.New(fmt.Sprintf("Error making request: %s", err))
 	}
 
 	// read the response body
-	// body, err := ioutil.ReadAll(resp.Body)
-	// if err != nil {
-	// 	fmt.Println("Error reading response: ", err)
-	// 	return
-	// }
-
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", nil, errors.New(fmt.Sprintf("Error reading response: %s", err))
+	}
 	// print the response body
-	//fmt.Println(string(body))
-	return resp.Header.Get("content-security-policy"), ""
+	doc, err := htmlquery.Parse(strings.NewReader(string(body)))
+	if err != nil {
+		log.Errorf("not a valid XPath expression.")
+	}
+	elements := htmlquery.Find(doc, "//meta[@http-equiv]")
+	redirect := false
+	redirectUrl := ""
+	for _, n := range elements {
+		for _, attributes := range n.Attr {
+			if attributes.Key == "content" {
+				content := strings.Split(attributes.Val, ";")
+				for _, value := range content {
+					if strings.HasPrefix(value, "url=") {
+						redirectUrl = strings.Split(value, "url=")[1]
+					}
+				}
+			}
+			if attributes.Key == "http-equiv" && attributes.Val == "refresh" {
+				redirect = true
+			}
+		}
+	}
+	finalUrl := resp.Request.URL
+	if redirect && len(redirectUrl) > 0 {
+		parsedRedirectUrl, err := url.Parse(redirectUrl)
+		if err != nil {
+			log.Errorf("Couln't parse redirect url %s. Error: %v", redirectUrl, err)
+			return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
+		}
+		absoluteRedirectUrl := req.URL.ResolveReference(parsedRedirectUrl)
+		log.Debugf("Fetching data from HTML meta redirect to %s", absoluteRedirectUrl.String())
+		return GetCSPFromWeb(absoluteRedirectUrl.String())
+	} else {
+		log.Infof("Final host: %s", finalUrl.String())
+	}
+
+	return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
 }

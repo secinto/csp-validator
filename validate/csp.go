@@ -1,4 +1,4 @@
-package csp
+package validate
 
 import (
 	"net/url"
@@ -7,13 +7,6 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 )
-
-// Policy represents the entire CSP policy and its directives.
-type Policy struct {
-	Directives              map[string]Directive
-	UpgradeInsecureRequests bool
-	BlockAllMixedContent    bool
-}
 
 // ParsePolicy parses all the directives in a CSP policy.
 func ParsePolicy(policy string) (Policy, error) {
@@ -35,7 +28,9 @@ func ParsePolicy(policy string) (Policy, error) {
 				return Policy{}, err
 			}
 			p.Directives[directiveType] = d
-
+		case "script-src-attr", "script-src-elem", "style-src-attr", "style-src-elem", "prefetch-src":
+			log.Debugf("Not handled element found: %s", directiveType)
+			continue
 		case "report-uri":
 			if len(fields) != 2 {
 				return Policy{}, errors.Errorf("report-uri expects 1 field; got %q", directive)
@@ -43,8 +38,11 @@ func ParsePolicy(policy string) (Policy, error) {
 			if _, err := url.Parse(fields[1]); err != nil {
 				return Policy{}, err
 			}
-
+		case "plugin-types", "sandbox", "disown-opener", "navigate-to", "reflected-xss", "referrer", "require-sri-for", "trusted-types", "require-trusted-types-for", "webrtc":
+			log.Debugf("Not handled element found: %s", directiveType)
+			continue
 		case "report-to":
+			log.Debugf("Not handled element found: %s", directiveType)
 			continue
 
 		case "upgrade-insecure-requests":
@@ -60,6 +58,8 @@ func ParsePolicy(policy string) (Policy, error) {
 			p.BlockAllMixedContent = true
 
 		default:
+			log.Debugf("Not processed element found: %s", directiveType)
+
 			return Policy{}, errors.Errorf("unknown directive %q", directive)
 		}
 	}

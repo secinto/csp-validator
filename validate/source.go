@@ -1,4 +1,4 @@
-package csp
+package validate
 
 import (
 	"crypto/sha256"
@@ -14,25 +14,6 @@ import (
 )
 
 var hostSchemeRegex = regexp.MustCompile(`((\w+|\*):(//)?)?(\*|\w+)(\.\w+)*(:(\d+|\*))?`)
-
-// SourceContext is the context required by a CSP policy.
-type SourceContext struct {
-	URL          url.URL
-	Page         url.URL
-	UnsafeInline bool
-	UnsafeEval   bool
-	Nonce        string
-	Body         []byte
-}
-
-// Report contains information about a CSP violation.
-type Report struct {
-	Document      string
-	Blocked       string
-	DirectiveName string
-	Directive     Directive
-	Context       SourceContext
-}
 
 // Report returns a report with the specified parameters.
 func (s SourceContext) Report(name string, directive Directive) Report {
@@ -60,21 +41,6 @@ func ParseSourceDirective(sources []string) (SourceDirective, error) {
 		return SourceDirective{}, err
 	}
 	return s, nil
-}
-
-// SourceDirective is used to enforce a CSP source policy on a URL.
-type SourceDirective struct {
-	ruleCount int
-
-	None         bool
-	Nonces       map[string]bool
-	Hashes       []HashSource
-	UnsafeEval   bool
-	UnsafeInline bool
-	Self         bool
-	Schemes      map[string]bool
-	Hosts        []glob.Glob
-	SrcHosts     []string
 }
 
 func urlSchemeHost(u url.URL) string {
@@ -134,12 +100,6 @@ func (s SourceDirective) Check(p Policy, ctx SourceContext) (bool, error) {
 	return originAllow && !isUnsafe, nil
 }
 
-// HashSource is a SourceDirective rule that matches the hash of content.
-type HashSource struct {
-	Algorithm func() hash.Hash
-	Value     string
-}
-
 // Check if the ctx hash matches this hash.
 func (s HashSource) Check(ctx SourceContext) (bool, error) {
 	h := s.Algorithm()
@@ -173,6 +133,24 @@ func (s *SourceDirective) ParseSource(source string) error {
 			return nil
 		case "'report-sample'":
 			// TODO: implement report-sample
+			return nil
+		case "'wasm-eval'":
+			// TODO: implement wasm-eval
+			return nil
+		case "'wasm-unsafe-eval'":
+			// TODO: implement wasm-unsafe-eval
+			return nil
+		case "'unsafe-hashed-attributes'":
+			// TODO: implement unsafe-hashed-attributes
+			return nil
+		case "'unsafe-hashes'":
+			// TODO: implement unsafe-hashes
+			return nil
+		case "'block'":
+			// TODO: implement block
+			return nil
+		case "'allow'":
+			// TODO: implement allow
 			return nil
 		}
 
