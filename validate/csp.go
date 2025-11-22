@@ -8,6 +8,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// defaultGlob is pre-compiled at package initialization to avoid runtime panics
+	defaultGlob = mustCompileGlob("*://*")
+)
+
+// mustCompileGlob compiles a glob pattern and panics if it fails.
+// This is only used during package initialization for static patterns.
+func mustCompileGlob(pattern string) glob.Glob {
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		panic("failed to compile static glob pattern: " + pattern + ": " + err.Error())
+	}
+	return g
+}
+
 // ParsePolicy parses all the directives in a CSP policy.
 func ParsePolicy(policy string) (Policy, error) {
 	p := Policy{
@@ -85,12 +100,8 @@ func (p Policy) Directive(name string) Directive {
 		return d
 	}
 
-	// If no directives use default policy.
-	g, err := glob.Compile("*://*")
-	if err != nil {
-		panic(err)
-	}
+	// If no directives use default policy (allow all).
 	return SourceDirective{
-		Hosts: []glob.Glob{g},
+		Hosts: []glob.Glob{defaultGlob},
 	}
 }

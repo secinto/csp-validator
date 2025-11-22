@@ -3,6 +3,7 @@ package validate
 import (
 	"github.com/gobwas/glob"
 	"hash"
+	"net/http"
 	"net/url"
 )
 
@@ -22,7 +23,8 @@ type Config struct {
 }
 
 type Validator struct {
-	options *Options
+	options    *Options
+	httpClient *http.Client
 }
 
 // Policy represents the entire CSP policy and its directives.

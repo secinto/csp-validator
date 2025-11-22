@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -15,25 +16,40 @@ var (
 )
 
 type Options struct {
-	SettingsFile string
-	Project      string
-	BaseFolder   string
-	LastModified bool
-	Silent       bool
-	Version      bool
-	NoColor      bool
-	Verbose      bool
+	SettingsFile        string
+	Project             string
+	BaseFolder          string
+	LastModified        bool
+	Silent              bool
+	Version             bool
+	NoColor             bool
+	Verbose             bool
+	InsecureSkipVerify  bool
+	MaxBodySize         int64
+	HTTPTimeout         int
+	MaxRedirects        int
 }
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
-	options := &Options{}
+	options := &Options{
+		MaxBodySize:  10 * 1024 * 1024, // 10MB default
+		HTTPTimeout:  10,                // 10 seconds default
+		MaxRedirects: 10,                // 10 redirects max
+	}
 	var err error
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`get simple findings from the obtained information for the specified project`)
 
 	flagSet.CreateGroup("input", "Input",
 		flagSet.StringVarP(&options.Project, "project", "p", "", "project name for metadata addition"),
+		flagSet.StringVarP(&options.SettingsFile, "settings", "s", defaultSettingsLocation, "path to settings YAML file"),
+	)
+
+	flagSet.CreateGroup("config", "Configuration",
+		flagSet.BoolVar(&options.InsecureSkipVerify, "insecure-skip-verify", false, "skip TLS certificate verification (DANGEROUS - use only for testing)"),
+		flagSet.IntVar(&options.HTTPTimeout, "timeout", 10, "HTTP request timeout in seconds"),
+		flagSet.IntVar(&options.MaxRedirects, "max-redirects", 10, "maximum number of redirects to follow"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
@@ -81,6 +97,10 @@ func (options *Options) configureOutput() {
 	if options.Silent {
 		log.SetLevel(logrus.PanicLevel)
 	}
+
+	if options.InsecureSkipVerify {
+		log.Warnf("WARNING: TLS certificate verification is disabled. This is DANGEROUS and should only be used for testing!")
+	}
 }
 
 // validateOptions validates the configuration options passed
@@ -89,6 +109,37 @@ func (options *Options) validateOptions() error {
 	// Both verbose and silent flags were used
 	if options.Verbose && options.Silent {
 		return errors.New("both verbose and silent mode specified")
+	}
+
+	// Validate project name to prevent path traversal
+	if options.Project != "" {
+		if err := validateProjectName(options.Project); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateProjectName validates project name to prevent path traversal attacks
+func validateProjectName(project string) error {
+	if project == "" {
+		return nil
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(project, "..") {
+		return errors.New("project name cannot contain '..'")
+	}
+
+	// Check for path separators
+	if strings.ContainsAny(project, "/\\") {
+		return errors.New("project name cannot contain path separators")
+	}
+
+	// Check for other dangerous characters
+	if strings.ContainsAny(project, "\x00") {
+		return errors.New("project name contains invalid characters")
 	}
 
 	return nil

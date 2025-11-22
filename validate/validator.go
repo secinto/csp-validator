@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"gopkg.in/yaml.v3"
 	"net/http"
-	"net/url"
 	"os"
+	"path/filepath"
 	utils "secinto/checkfix_utils"
 	"strings"
+	"time"
 )
 
 var (
@@ -23,18 +24,25 @@ func NewValidator(options *Options) (*Validator, error) {
 
 func (p *Validator) initialize(configLocation string) {
 	appConfig = loadConfigFrom(configLocation)
-	if !strings.HasSuffix(appConfig.ProjectsPath, "/") {
-		appConfig.ProjectsPath = appConfig.ProjectsPath + "/"
-	}
-	p.options.BaseFolder = appConfig.ProjectsPath + p.options.Project
-	if !strings.HasSuffix(p.options.BaseFolder, "/") {
-		p.options.BaseFolder = p.options.BaseFolder + "/"
-	}
+
+	// Use filepath.Join for proper path handling
+	p.options.BaseFolder = filepath.Join(appConfig.ProjectsPath, p.options.Project)
 
 	appConfig.DpuxFile = strings.Replace(appConfig.DpuxFile, "{project_name}", p.options.Project, -1)
 	appConfig.PortsXMLFile = strings.Replace(appConfig.PortsXMLFile, "{project_name}", p.options.Project, -1)
 
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	// Create HTTP client with configurable TLS and timeout settings
+	p.httpClient = &http.Client{
+		Timeout: time.Duration(p.options.HTTPTimeout) * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: p.options.InsecureSkipVerify,
+			},
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
 }
 
 func loadConfigFrom(location string) Config {
@@ -55,16 +63,11 @@ func loadConfigFrom(location string) Config {
 		log.Fatalf("Unmarshal: %v", err)
 	}
 
-	if &config == nil {
-		config = Config{
-			ProjectsPath: "/checkfix/projects",
-		}
+	// Set defaults for missing fields
+	if config.ProjectsPath == "" {
+		config.ProjectsPath = "/checkfix/projects"
 	}
 
-	err = yaml.Unmarshal(yamlFile, &config)
-	if err != nil {
-		log.Fatalf("Unmarshal: %v", err)
-	}
 	return config
 }
 
@@ -76,7 +79,7 @@ func (p *Validator) Validate() error {
 	log.Infof("Validate HTTP content for project %s", p.options.Project)
 	if p.options.Project != "" {
 		p.CheckCSPForHosts()
-		log.Infof("Finished validiting host HTTP content.")
+		log.Infof("Finished validating host HTTP content.")
 	} else {
 		log.Fatal("Project must be specified")
 	}
@@ -84,7 +87,7 @@ func (p *Validator) Validate() error {
 }
 
 func (p *Validator) CheckCSPForHosts() {
-	domainsWithPortsFile := p.options.BaseFolder + "domains_with_ports.txt"
+	domainsWithPortsFile := filepath.Join(p.options.BaseFolder, "domains_with_ports.txt")
 	log.Infof("Using domains with ports input %s", domainsWithPortsFile)
 	domainsWithPorts := utils.ReadPlainTextFileByLines(domainsWithPortsFile)
 	for _, domainWithPort := range domainsWithPorts {
@@ -97,7 +100,7 @@ func (p *Validator) CheckCSPForHosts() {
 
 func (p *Validator) validateHost(host string) {
 	log.Infof("Validating host %s", strings.TrimSpace(host))
-	csp, body, finalHost, err := GetCSPFromWeb(host)
+	csp, body, finalHost, err := GetCSPFromWeb(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects)
 	if err != nil {
 		log.Debugf("Error during GetCSPFromWeb: %v", err)
 		log.Infof("[ERROR] No response for: %s", host)
@@ -107,7 +110,7 @@ func (p *Validator) validateHost(host string) {
 			if err != nil {
 				log.Errorf("Error during ParsePolicy: %v", err)
 			}
-			page, err := url.Parse(finalHost.String())
+			page, err := ParseURL(finalHost.String())
 			if err != nil {
 				log.Errorf("Error parsing URL: %v", err)
 			}
@@ -121,11 +124,16 @@ func (p *Validator) validateHost(host string) {
 				log.Infof("[OK] Validated policy: %s", csp)
 			} else {
 				log.Infof("[FAIL] Validation was not successful: %v", reports)
-				log.Infof("[FAIL Validated policy: %s", csp)
+				log.Infof("[FAIL] Validated policy: %s", csp)
 			}
 		} else {
 			log.Infof("[MISS] No CSP found for host: %s", host)
 		}
 	}
 
+}
+
+// ParseURL is a helper function that wraps url.Parse
+func ParseURL(urlStr string) (*url.URL, error) {
+	return url.Parse(urlStr)
 }
