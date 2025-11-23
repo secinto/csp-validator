@@ -248,16 +248,23 @@ func (p *Validator) CheckCSPForHosts(ctx context.Context) error {
 		close(results)
 	}()
 
-	// Process results as they come in
+	// Collect all results
+	var allResults []ValidationResult
 	canceled := false
 	for result := range results {
 		select {
 		case <-ctx.Done():
 			canceled = true
 		default:
+			allResults = append(allResults, result)
+			// Still report individual results for real-time feedback
 			p.reportResult(result)
 		}
 	}
+
+	// Generate and log summary
+	summary := p.generateSummary(allResults)
+	p.logSummary(summary)
 
 	if canceled {
 		return ErrValidationCanceled
@@ -392,4 +399,88 @@ func (p *Validator) reportResult(result ValidationResult) {
 	} else {
 		p.reporter.ReportFailure(result.Host, result.CSP, result.Reports)
 	}
+}
+
+// generateSummary creates a ValidationSummary from a slice of ValidationResults
+func (p *Validator) generateSummary(results []ValidationResult) ValidationSummary {
+	summary := ValidationSummary{
+		TotalHosts:    len(results),
+		SuccessHosts:  make([]string, 0),
+		FailureHosts:  make([]ValidationFailure, 0),
+		ErrorHosts:    make([]ValidationError, 0),
+		MissingHosts:  make([]string, 0),
+		CanceledHosts: make([]string, 0),
+	}
+
+	for _, result := range results {
+		if result.Error != nil {
+			if errors.Is(result.Error, ErrValidationCanceled) {
+				summary.CanceledCount++
+				summary.CanceledHosts = append(summary.CanceledHosts, result.Host)
+			} else {
+				summary.ErrorCount++
+				summary.ErrorHosts = append(summary.ErrorHosts, ValidationError{
+					Host:  result.Host,
+					Error: result.Error,
+				})
+			}
+		} else if result.CSP == "" {
+			summary.MissingCSPCount++
+			summary.MissingHosts = append(summary.MissingHosts, result.Host)
+		} else if result.Valid {
+			summary.SuccessCount++
+			summary.SuccessHosts = append(summary.SuccessHosts, result.Host)
+		} else {
+			summary.FailureCount++
+			summary.FailureHosts = append(summary.FailureHosts, ValidationFailure{
+				Host:    result.Host,
+				CSP:     result.CSP,
+				Reports: result.Reports,
+			})
+		}
+	}
+
+	return summary
+}
+
+// logSummary logs a ValidationSummary
+func (p *Validator) logSummary(summary ValidationSummary) {
+	p.logger.Infof("=" + strings.Repeat("=", 78))
+	p.logger.Infof("VALIDATION SUMMARY")
+	p.logger.Infof("=" + strings.Repeat("=", 78))
+	p.logger.Infof("Total Hosts:       %d", summary.TotalHosts)
+	p.logger.Infof("Success:           %d (%.1f%%)", summary.SuccessCount, percentage(summary.SuccessCount, summary.TotalHosts))
+	p.logger.Infof("Failures:          %d (%.1f%%)", summary.FailureCount, percentage(summary.FailureCount, summary.TotalHosts))
+	p.logger.Infof("Errors:            %d (%.1f%%)", summary.ErrorCount, percentage(summary.ErrorCount, summary.TotalHosts))
+	p.logger.Infof("Missing CSP:       %d (%.1f%%)", summary.MissingCSPCount, percentage(summary.MissingCSPCount, summary.TotalHosts))
+
+	if summary.CanceledCount > 0 {
+		p.logger.Infof("Canceled:          %d (%.1f%%)", summary.CanceledCount, percentage(summary.CanceledCount, summary.TotalHosts))
+	}
+
+	p.logger.Infof("=" + strings.Repeat("=", 78))
+
+	// Log details for failures if verbose mode is enabled
+	if p.options.Verbose && len(summary.FailureHosts) > 0 {
+		p.logger.Infof("\nFailed Validations (%d):", len(summary.FailureHosts))
+		for _, failure := range summary.FailureHosts {
+			p.logger.Infof("  - %s: %d violations", failure.Host, len(failure.Reports))
+		}
+	}
+
+	// Log details for errors if verbose mode is enabled
+	if p.options.Verbose && len(summary.ErrorHosts) > 0 {
+		p.logger.Infof("\nValidation Errors (%d):", len(summary.ErrorHosts))
+		for _, err := range summary.ErrorHosts {
+			p.logger.Infof("  - %s: %v", err.Host, err.Error)
+		}
+	}
+}
+
+// percentage calculates the percentage of part out of total
+func percentage(part, total int) float64 {
+	if total == 0 {
+		return 0.0
+	}
+	return (float64(part) / float64(total)) * 100.0
 }

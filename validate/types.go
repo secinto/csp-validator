@@ -132,3 +132,31 @@ type ValidationResult struct {
 	Reports []Report
 	Error   error
 }
+
+// ValidationSummary contains aggregated validation results and statistics
+type ValidationSummary struct {
+	TotalHosts    int
+	SuccessCount  int
+	FailureCount  int
+	ErrorCount    int
+	MissingCSPCount int
+	CanceledCount int
+	SuccessHosts  []string
+	FailureHosts  []ValidationFailure
+	ErrorHosts    []ValidationError
+	MissingHosts  []string
+	CanceledHosts []string
+}
+
+// ValidationFailure represents a host that failed CSP validation
+type ValidationFailure struct {
+	Host    string
+	CSP     string
+	Reports []Report
+}
+
+// ValidationError represents a host that encountered an error during validation
+type ValidationError struct {
+	Host  string
+	Error error
+}
