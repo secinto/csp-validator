@@ -88,6 +88,13 @@ func loadConfigFrom(location string, logger Logger) (Config, error) {
 		config.ProjectsPath = "/checkfix/projects"
 	}
 
+	// Validate the configuration
+	if err := config.Validate(); err != nil {
+		logger.Warnf("Configuration validation warning: %v", err)
+		// Don't fail on validation errors for now, just warn
+		// This maintains backward compatibility
+	}
+
 	return config, nil
 }
 

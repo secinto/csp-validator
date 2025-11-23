@@ -1,13 +1,21 @@
 package validate
 
 import (
+	"errors"
 	"github.com/gobwas/glob"
 	"hash"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 const VERSION = "0.1.0"
+
+// Configuration validation errors
+var (
+	ErrInvalidProjectsPath = errors.New("projects_path is empty or invalid")
+	ErrProjectsPathNotExist = errors.New("projects_path directory does not exist")
+)
 
 type Config struct {
 	ProjectsPath     string `yaml:"projects_path,omitempty"`
@@ -20,6 +28,26 @@ type Config struct {
 	HttpxCleanFile   string `yaml:"httpx_clean,omitempty"`
 	PortsXMLFile     string `yaml:"ports_xml,omitempty"`
 	PortsSimpleFile  string `yaml:"ports_simple,omitempty"`
+}
+
+// Validate checks if the configuration is valid
+func (c Config) Validate() error {
+	// Check that ProjectsPath is not empty
+	if c.ProjectsPath == "" {
+		return ErrInvalidProjectsPath
+	}
+
+	// Check if the projects path exists
+	if info, err := os.Stat(c.ProjectsPath); err != nil {
+		if os.IsNotExist(err) {
+			return ErrProjectsPathNotExist
+		}
+		return err
+	} else if !info.IsDir() {
+		return errors.New("projects_path is not a directory")
+	}
+
+	return nil
 }
 
 type Validator struct {
