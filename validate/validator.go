@@ -21,6 +21,20 @@ var (
 )
 
 func NewValidator(options *Options) (*Validator, error) {
+	return NewValidatorWithDependencies(options, nil, nil, nil, nil, nil, nil)
+}
+
+// NewValidatorWithDependencies creates a new Validator with injected dependencies.
+// Pass nil for any dependency to use the default implementation.
+func NewValidatorWithDependencies(
+	options *Options,
+	cspFetcher CSPFetcher,
+	cspParser CSPParser,
+	htmlValidator HTMLValidator,
+	stylesheetValidator StylesheetValidator,
+	domainSource DomainSource,
+	reporter Reporter,
+) (*Validator, error) {
 	// Create logger instance
 	logger := utils.NewLogger()
 
@@ -31,6 +45,43 @@ func NewValidator(options *Options) (*Validator, error) {
 
 	if err := validator.initialize(options.SettingsFile); err != nil {
 		return nil, err
+	}
+
+	// Inject dependencies or use defaults
+	if cspFetcher == nil {
+		validator.cspFetcher = NewDefaultCSPFetcher()
+	} else {
+		validator.cspFetcher = cspFetcher
+	}
+
+	if cspParser == nil {
+		validator.cspParser = NewDefaultCSPParser()
+	} else {
+		validator.cspParser = cspParser
+	}
+
+	if htmlValidator == nil {
+		validator.htmlValidator = NewDefaultHTMLValidator()
+	} else {
+		validator.htmlValidator = htmlValidator
+	}
+
+	if stylesheetValidator == nil {
+		validator.stylesheetValidator = NewDefaultStylesheetValidator()
+	} else {
+		validator.stylesheetValidator = stylesheetValidator
+	}
+
+	if domainSource == nil {
+		validator.domainSource = NewFileDomainSource(validator.options.BaseFolder)
+	} else {
+		validator.domainSource = domainSource
+	}
+
+	if reporter == nil {
+		validator.reporter = NewLoggerReporter(logger)
+	} else {
+		validator.reporter = reporter
 	}
 
 	return validator, nil
@@ -116,7 +167,14 @@ func (p *Validator) Validate() error {
 func (p *Validator) CheckCSPForHosts() {
 	domainsWithPortsFile := filepath.Join(p.options.BaseFolder, "domains_with_ports.txt")
 	p.logger.Infof("Using domains with ports input %s", domainsWithPortsFile)
-	domainsWithPorts := utils.ReadPlainTextFileByLines(domainsWithPortsFile)
+
+	// Use injected domain source
+	domainsWithPorts, err := p.domainSource.GetDomains()
+	if err != nil {
+		p.logger.Errorf("Error getting domains: %v", err)
+		return
+	}
+
 	for _, domainWithPort := range domainsWithPorts {
 		if len(domainWithPort) > 0 {
 			p.validateHost("https://" + domainWithPort)
@@ -127,37 +185,50 @@ func (p *Validator) CheckCSPForHosts() {
 
 func (p *Validator) validateHost(host string) {
 	p.logger.Infof("Validating host %s", strings.TrimSpace(host))
-	csp, body, finalHost, err := GetCSPFromWeb(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
-	if err != nil {
-		p.logger.Debugf("Error during GetCSPFromWeb: %v", err)
-		p.logger.Infof("[ERROR] No response for: %s", host)
-	} else {
-		if len(csp) > 0 {
-			policy, err := ParsePolicy(csp, p.logger)
-			if err != nil {
-				p.logger.Errorf("Error during ParsePolicy: %v", err)
-			}
-			page, err := ParseURL(finalHost.String())
-			if err != nil {
-				p.logger.Errorf("Error parsing URL: %v", err)
-			}
 
-			valid, reports, err := ValidatePage(policy, *page, strings.NewReader(body))
-			if err != nil {
-				p.logger.Errorf("Error during validating page: %v", err)
-			}
-			if valid {
-				p.logger.Infof("[OK] Validation was successful for %s", host)
-				p.logger.Infof("[OK] Validated policy: %s", csp)
-			} else {
-				p.logger.Infof("[FAIL] Validation was not successful: %v", reports)
-				p.logger.Infof("[FAIL] Validated policy: %s", csp)
-			}
-		} else {
-			p.logger.Infof("[MISS] No CSP found for host: %s", host)
-		}
+	// Use injected CSP fetcher
+	csp, body, finalHost, err := p.cspFetcher.FetchCSP(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
+	if err != nil {
+		p.reporter.ReportError(host, err)
+		return
 	}
 
+	// Check if CSP was found
+	if len(csp) == 0 {
+		p.reporter.ReportMissing(host)
+		return
+	}
+
+	// Use injected CSP parser
+	policy, err := p.cspParser.Parse(csp, p.logger)
+	if err != nil {
+		p.logger.Errorf("Error during ParsePolicy: %v", err)
+		p.reporter.ReportError(host, err)
+		return
+	}
+
+	// Parse final URL
+	page, err := ParseURL(finalHost.String())
+	if err != nil {
+		p.logger.Errorf("Error parsing URL: %v", err)
+		p.reporter.ReportError(host, err)
+		return
+	}
+
+	// Use injected HTML validator
+	valid, reports, err := p.htmlValidator.Validate(policy, *page, strings.NewReader(body))
+	if err != nil {
+		p.logger.Errorf("Error during validating page: %v", err)
+		p.reporter.ReportError(host, err)
+		return
+	}
+
+	// Use injected reporter
+	if valid {
+		p.reporter.ReportSuccess(host, csp)
+	} else {
+		p.reporter.ReportFailure(host, csp, reports)
+	}
 }
 
 // ParseURL is a helper function that wraps url.Parse

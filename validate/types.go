@@ -55,6 +55,14 @@ type Validator struct {
 	config     Config
 	httpClient *http.Client
 	logger     Logger
+
+	// Dependencies (injected)
+	cspFetcher          CSPFetcher
+	cspParser           CSPParser
+	htmlValidator       HTMLValidator
+	stylesheetValidator StylesheetValidator
+	domainSource        DomainSource
+	reporter            Reporter
 }
 
 // Logger interface for dependency injection
