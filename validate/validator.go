@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"gopkg.in/yaml.v3"
@@ -18,7 +19,8 @@ var (
 	defaultSettingsLocation = filepath.Join(os.Getenv("HOME"), ".config/analyzeResponses/settings.yaml")
 
 	// Common errors
-	ErrProjectRequired = errors.New("project must be specified")
+	ErrProjectRequired   = errors.New("project must be specified")
+	ErrValidationCanceled = errors.New("validation was canceled")
 )
 
 func NewValidator(options *Options) (*Validator, error) {
@@ -160,12 +162,19 @@ func (p *Validator) Validate() error {
 		return ErrProjectRequired
 	}
 
-	p.CheckCSPForHosts()
+	// Create context for validation operations
+	ctx := context.Background()
+
+	err := p.CheckCSPForHosts(ctx)
+	if err != nil {
+		return err
+	}
+
 	p.logger.Infof("Finished validating host HTTP content.")
 	return nil
 }
 
-func (p *Validator) CheckCSPForHosts() {
+func (p *Validator) CheckCSPForHosts(ctx context.Context) error {
 	domainsWithPortsFile := filepath.Join(p.options.BaseFolder, "domains_with_ports.txt")
 	p.logger.Infof("Using domains with ports input %s", domainsWithPortsFile)
 
@@ -173,7 +182,7 @@ func (p *Validator) CheckCSPForHosts() {
 	domainsWithPorts, err := p.domainSource.GetDomains()
 	if err != nil {
 		p.logger.Errorf("Error getting domains: %v", err)
-		return
+		return err
 	}
 
 	// Build list of URLs to validate
@@ -187,7 +196,7 @@ func (p *Validator) CheckCSPForHosts() {
 
 	if len(urls) == 0 {
 		p.logger.Infof("No domains to validate")
-		return
+		return nil
 	}
 
 	p.logger.Infof("Validating %d URLs with %d workers", len(urls), p.options.Concurrency)
@@ -203,8 +212,18 @@ func (p *Validator) CheckCSPForHosts() {
 		go func() {
 			defer wg.Done()
 			for url := range jobs {
-				result := p.validateHostWithResult(url)
-				results <- result
+				// Check if context was canceled
+				select {
+				case <-ctx.Done():
+					results <- ValidationResult{
+						Host:  url,
+						Error: ErrValidationCanceled,
+					}
+					return
+				default:
+					result := p.validateHostWithResult(ctx, url)
+					results <- result
+				}
 			}
 		}()
 	}
@@ -212,7 +231,13 @@ func (p *Validator) CheckCSPForHosts() {
 	// Send jobs
 	go func() {
 		for _, url := range urls {
-			jobs <- url
+			select {
+			case <-ctx.Done():
+				// Context canceled, stop sending jobs
+				close(jobs)
+				return
+			case jobs <- url:
+			}
 		}
 		close(jobs)
 	}()
@@ -224,16 +249,28 @@ func (p *Validator) CheckCSPForHosts() {
 	}()
 
 	// Process results as they come in
+	canceled := false
 	for result := range results {
-		p.reportResult(result)
+		select {
+		case <-ctx.Done():
+			canceled = true
+		default:
+			p.reportResult(result)
+		}
 	}
+
+	if canceled {
+		return ErrValidationCanceled
+	}
+
+	return nil
 }
 
-func (p *Validator) validateHost(host string) {
+func (p *Validator) validateHost(ctx context.Context, host string) {
 	p.logger.Infof("Validating host %s", strings.TrimSpace(host))
 
 	// Use injected CSP fetcher
-	csp, body, finalHost, err := p.cspFetcher.FetchCSP(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
+	csp, body, finalHost, err := p.cspFetcher.FetchCSP(ctx, p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
 	if err != nil {
 		p.reporter.ReportError(host, err)
 		return
@@ -283,15 +320,23 @@ func ParseURL(urlStr string) (*url.URL, error) {
 }
 
 // validateHostWithResult validates a host and returns a ValidationResult
-func (p *Validator) validateHostWithResult(host string) ValidationResult {
+func (p *Validator) validateHostWithResult(ctx context.Context, host string) ValidationResult {
 	p.logger.Infof("Validating host %s", strings.TrimSpace(host))
 
 	result := ValidationResult{
 		Host: host,
 	}
 
+	// Check if context was canceled before starting
+	select {
+	case <-ctx.Done():
+		result.Error = ErrValidationCanceled
+		return result
+	default:
+	}
+
 	// Use injected CSP fetcher
-	csp, body, finalHost, err := p.cspFetcher.FetchCSP(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
+	csp, body, finalHost, err := p.cspFetcher.FetchCSP(ctx, p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
 	if err != nil {
 		result.Error = err
 		return result

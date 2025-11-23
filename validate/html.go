@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
@@ -135,19 +136,26 @@ func ValidatePage(p Policy, page url.URL, html io.Reader) (bool, []Report, error
 }
 
 // GetCSPFromWeb retrieves the current CSP setting from a web page
-func GetCSPFromWeb(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
-	return getCSPFromWebWithDepth(client, webaddress, maxBodySize, maxRedirects, 0, logger)
+func GetCSPFromWeb(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
+	return getCSPFromWebWithDepth(ctx, client, webaddress, maxBodySize, maxRedirects, 0, logger)
 }
 
 // getCSPFromWebWithDepth is the internal function that tracks redirect depth
-func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, depth int, logger Logger) (string, string, *url.URL, error) {
+func getCSPFromWebWithDepth(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, depth int, logger Logger) (string, string, *url.URL, error) {
 	// Check if we've exceeded max redirect depth
 	if depth > maxRedirects {
 		return "", "", nil, errors.Errorf("maximum redirect depth (%d) exceeded", maxRedirects)
 	}
 
-	// Create a new GET request
-	req, err := http.NewRequest("GET", webaddress, nil)
+	// Check if context was canceled
+	select {
+	case <-ctx.Done():
+		return "", "", nil, ctx.Err()
+	default:
+	}
+
+	// Create a new GET request with context
+	req, err := http.NewRequestWithContext(ctx, "GET", webaddress, nil)
 	if err != nil {
 		return "", "", nil, errors.Wrap(err, "error creating request")
 	}
@@ -209,8 +217,8 @@ func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize 
 		}
 		absoluteRedirectUrl := req.URL.ResolveReference(parsedRedirectUrl)
 		logger.Debugf("Following HTML meta redirect to %s (depth: %d)", absoluteRedirectUrl.String(), depth+1)
-		// Recursive call with incremented depth
-		return getCSPFromWebWithDepth(client, absoluteRedirectUrl.String(), maxBodySize, maxRedirects, depth+1, logger)
+		// Recursive call with incremented depth and context
+		return getCSPFromWebWithDepth(ctx, client, absoluteRedirectUrl.String(), maxBodySize, maxRedirects, depth+1, logger)
 	}
 
 	logger.Debugf("Final host: %s", finalUrl.String())

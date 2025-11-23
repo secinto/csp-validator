@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,8 +13,8 @@ import (
 type DefaultCSPFetcher struct{}
 
 // FetchCSP implements CSPFetcher interface
-func (f *DefaultCSPFetcher) FetchCSP(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
-	return GetCSPFromWeb(client, webaddress, maxBodySize, maxRedirects, logger)
+func (f *DefaultCSPFetcher) FetchCSP(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
+	return GetCSPFromWeb(ctx, client, webaddress, maxBodySize, maxRedirects, logger)
 }
 
 // DefaultCSPParser is the default implementation of CSPParser

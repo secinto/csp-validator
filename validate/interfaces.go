@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,7 +10,7 @@ import (
 // CSPFetcher defines the interface for fetching CSP policies from web pages
 type CSPFetcher interface {
 	// FetchCSP retrieves the CSP policy, HTML body, and final URL from a web address
-	FetchCSP(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (csp string, body string, finalURL *url.URL, err error)
+	FetchCSP(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (csp string, body string, finalURL *url.URL, err error)
 }
 
 // CSPParser defines the interface for parsing CSP policy strings
