@@ -135,12 +135,12 @@ func ValidatePage(p Policy, page url.URL, html io.Reader) (bool, []Report, error
 }
 
 // GetCSPFromWeb retrieves the current CSP setting from a web page
-func GetCSPFromWeb(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int) (string, string, *url.URL, error) {
-	return getCSPFromWebWithDepth(client, webaddress, maxBodySize, maxRedirects, 0)
+func GetCSPFromWeb(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
+	return getCSPFromWebWithDepth(client, webaddress, maxBodySize, maxRedirects, 0, logger)
 }
 
 // getCSPFromWebWithDepth is the internal function that tracks redirect depth
-func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, depth int) (string, string, *url.URL, error) {
+func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, depth int, logger Logger) (string, string, *url.URL, error) {
 	// Check if we've exceeded max redirect depth
 	if depth > maxRedirects {
 		return "", "", nil, errors.Errorf("maximum redirect depth (%d) exceeded", maxRedirects)
@@ -168,13 +168,13 @@ func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize 
 
 	// Warn if we hit the size limit
 	if int64(len(body)) == maxBodySize {
-		log.Warnf("Response body truncated at %d bytes for %s", maxBodySize, webaddress)
+		logger.Warnf("Response body truncated at %d bytes for %s", maxBodySize, webaddress)
 	}
 
 	// Parse HTML to check for meta refresh redirects
 	doc, err := htmlquery.Parse(strings.NewReader(string(body)))
 	if err != nil {
-		log.Debugf("Could not parse HTML for redirect detection: %v", err)
+		logger.Debugf("Could not parse HTML for redirect detection: %v", err)
 		// Not a fatal error - return what we have
 		return resp.Header.Get("content-security-policy"), string(body), resp.Request.URL, nil
 	}
@@ -204,15 +204,15 @@ func getCSPFromWebWithDepth(client *http.Client, webaddress string, maxBodySize 
 	if redirect && len(redirectUrl) > 0 {
 		parsedRedirectUrl, err := url.Parse(redirectUrl)
 		if err != nil {
-			log.Errorf("Couldn't parse redirect url %s. Error: %v", redirectUrl, err)
+			logger.Errorf("Couldn't parse redirect url %s. Error: %v", redirectUrl, err)
 			return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
 		}
 		absoluteRedirectUrl := req.URL.ResolveReference(parsedRedirectUrl)
-		log.Debugf("Following HTML meta redirect to %s (depth: %d)", absoluteRedirectUrl.String(), depth+1)
+		logger.Debugf("Following HTML meta redirect to %s (depth: %d)", absoluteRedirectUrl.String(), depth+1)
 		// Recursive call with incremented depth
-		return getCSPFromWebWithDepth(client, absoluteRedirectUrl.String(), maxBodySize, maxRedirects, depth+1)
+		return getCSPFromWebWithDepth(client, absoluteRedirectUrl.String(), maxBodySize, maxRedirects, depth+1, logger)
 	}
 
-	log.Debugf("Final host: %s", finalUrl.String())
+	logger.Debugf("Final host: %s", finalUrl.String())
 	return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
 }

@@ -24,7 +24,7 @@ func mustCompileGlob(pattern string) glob.Glob {
 }
 
 // ParsePolicy parses all the directives in a CSP policy.
-func ParsePolicy(policy string) (Policy, error) {
+func ParsePolicy(policy string, logger Logger) (Policy, error) {
 	p := Policy{
 		Directives: map[string]Directive{},
 	}
@@ -44,7 +44,7 @@ func ParsePolicy(policy string) (Policy, error) {
 			}
 			p.Directives[directiveType] = d
 		case "script-src-attr", "script-src-elem", "style-src-attr", "style-src-elem", "prefetch-src":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 		case "report-uri":
 			if len(fields) != 2 {
@@ -54,10 +54,10 @@ func ParsePolicy(policy string) (Policy, error) {
 				return Policy{}, err
 			}
 		case "plugin-types", "sandbox", "disown-opener", "navigate-to", "reflected-xss", "referrer", "require-sri-for", "trusted-types", "require-trusted-types-for", "webrtc":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 		case "report-to":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 
 		case "upgrade-insecure-requests":
@@ -73,7 +73,7 @@ func ParsePolicy(policy string) (Policy, error) {
 			p.BlockAllMixedContent = true
 
 		default:
-			log.Debugf("Not processed element found: %s", directiveType)
+			logger.Debugf("Not processed element found: %s", directiveType)
 
 			return Policy{}, errors.Errorf("unknown directive %q", directive)
 		}

@@ -24,7 +24,21 @@ type Config struct {
 
 type Validator struct {
 	options    *Options
+	config     Config
 	httpClient *http.Client
+	logger     Logger
+}
+
+// Logger interface for dependency injection
+type Logger interface {
+	Tracef(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	SetLevel(level interface{})
+	SetFormatter(formatter interface{})
 }
 
 // Policy represents the entire CSP policy and its directives.

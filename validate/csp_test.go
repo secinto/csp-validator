@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+// mockLogger is a test logger that does nothing
+type mockLogger struct{}
+
+func (m *mockLogger) Tracef(format string, args ...interface{})  {}
+func (m *mockLogger) Debugf(format string, args ...interface{})  {}
+func (m *mockLogger) Infof(format string, args ...interface{})   {}
+func (m *mockLogger) Warnf(format string, args ...interface{})   {}
+func (m *mockLogger) Errorf(format string, args ...interface{})  {}
+func (m *mockLogger) Fatalf(format string, args ...interface{})  {}
+func (m *mockLogger) SetLevel(level interface{})                 {}
+func (m *mockLogger) SetFormatter(formatter interface{})          {}
+
 func checkErr(t *testing.T, got error, want string) {
 	if got == nil && want == "" {
 		return
@@ -273,7 +285,8 @@ func TestCSP(t *testing.T) {
 
 			t.Logf("testCase{%q, %q, %q}", c.policy, c.page, c.html)
 
-			p, err := ParsePolicy(c.policy)
+			logger := &mockLogger{}
+			p, err := ParsePolicy(c.policy, logger)
 			checkErr(t, err, c.policyErr)
 			page, err := url.Parse(c.page)
 			if err != nil {
