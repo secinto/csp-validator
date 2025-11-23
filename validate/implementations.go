@@ -21,8 +21,8 @@ func (f *DefaultCSPFetcher) FetchCSP(ctx context.Context, client *http.Client, w
 type DefaultCSPParser struct{}
 
 // Parse implements CSPParser interface
-func (p *DefaultCSPParser) Parse(policy string, logger Logger) (Policy, error) {
-	return ParsePolicy(policy, logger)
+func (p *DefaultCSPParser) Parse(policy string, logger Logger, globCache *GlobCache) (Policy, error) {
+	return ParsePolicy(policy, logger, globCache)
 }
 
 // DefaultHTMLValidator is the default implementation of HTMLValidator

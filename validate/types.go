@@ -55,6 +55,7 @@ type Validator struct {
 	config     Config
 	httpClient *http.Client
 	logger     Logger
+	globCache  *GlobCache
 
 	// Dependencies (injected)
 	cspFetcher          CSPFetcher

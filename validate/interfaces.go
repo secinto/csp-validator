@@ -16,7 +16,7 @@ type CSPFetcher interface {
 // CSPParser defines the interface for parsing CSP policy strings
 type CSPParser interface {
 	// Parse converts a CSP policy string into a Policy object
-	Parse(policy string, logger Logger) (Policy, error)
+	Parse(policy string, logger Logger, globCache *GlobCache) (Policy, error)
 }
 
 // HTMLValidator defines the interface for validating HTML against CSP policies

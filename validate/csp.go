@@ -24,7 +24,7 @@ func mustCompileGlob(pattern string) glob.Glob {
 }
 
 // ParsePolicy parses all the directives in a CSP policy.
-func ParsePolicy(policy string, logger Logger) (Policy, error) {
+func ParsePolicy(policy string, logger Logger, globCache *GlobCache) (Policy, error) {
 	p := Policy{
 		Directives: map[string]Directive{},
 	}
@@ -38,7 +38,7 @@ func ParsePolicy(policy string, logger Logger) (Policy, error) {
 		directiveType := fields[0]
 		switch directiveType {
 		case "base-uri", "child-src", "connect-src", "default-src", "font-src", "form-action", "frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src":
-			d, err := ParseSourceDirective(fields[1:])
+			d, err := ParseSourceDirective(fields[1:], globCache)
 			if err != nil {
 				return Policy{}, err
 			}

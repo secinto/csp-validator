@@ -286,7 +286,8 @@ func TestCSP(t *testing.T) {
 			t.Logf("testCase{%q, %q, %q}", c.policy, c.page, c.html)
 
 			logger := &mockLogger{}
-			p, err := ParsePolicy(c.policy, logger)
+			globCache := NewGlobCache()
+			p, err := ParsePolicy(c.policy, logger, globCache)
 			checkErr(t, err, c.policyErr)
 			page, err := url.Parse(c.page)
 			if err != nil {

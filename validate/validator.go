@@ -42,8 +42,9 @@ func NewValidatorWithDependencies(
 	logger := utils.NewLogger()
 
 	validator := &Validator{
-		options: options,
-		logger:  logger,
+		options:   options,
+		logger:    logger,
+		globCache: NewGlobCache(),
 	}
 
 	if err := validator.initialize(options.SettingsFile); err != nil {
@@ -290,7 +291,7 @@ func (p *Validator) validateHost(ctx context.Context, host string) {
 	}
 
 	// Use injected CSP parser
-	policy, err := p.cspParser.Parse(csp, p.logger)
+	policy, err := p.cspParser.Parse(csp, p.logger, p.globCache)
 	if err != nil {
 		p.logger.Errorf("Error during ParsePolicy: %v", err)
 		p.reporter.ReportError(host, err)
@@ -359,7 +360,7 @@ func (p *Validator) validateHostWithResult(ctx context.Context, host string) Val
 	result.CSP = csp
 
 	// Use injected CSP parser
-	policy, err := p.cspParser.Parse(csp, p.logger)
+	policy, err := p.cspParser.Parse(csp, p.logger, p.globCache)
 	if err != nil {
 		p.logger.Errorf("Error during ParsePolicy: %v", err)
 		result.Error = err
