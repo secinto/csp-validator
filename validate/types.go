@@ -123,3 +123,12 @@ type Report struct {
 	Directive     Directive
 	Context       SourceContext
 }
+
+// ValidationResult contains the result of validating a single host
+type ValidationResult struct {
+	Host    string
+	Valid   bool
+	CSP     string
+	Reports []Report
+	Error   error
+}

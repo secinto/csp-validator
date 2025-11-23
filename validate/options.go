@@ -28,6 +28,7 @@ type Options struct {
 	MaxBodySize         int64
 	HTTPTimeout         int
 	MaxRedirects        int
+	Concurrency         int
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -36,6 +37,7 @@ func ParseOptions() *Options {
 		MaxBodySize:  10 * 1024 * 1024, // 10MB default
 		HTTPTimeout:  10,                // 10 seconds default
 		MaxRedirects: 10,                // 10 redirects max
+		Concurrency:  10,                // 10 concurrent workers default
 	}
 	var err error
 	flagSet := goflags.NewFlagSet()
@@ -50,6 +52,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.InsecureSkipVerify, "insecure-skip-verify", false, "skip TLS certificate verification (DANGEROUS - use only for testing)"),
 		flagSet.IntVar(&options.HTTPTimeout, "timeout", 10, "HTTP request timeout in seconds"),
 		flagSet.IntVar(&options.MaxRedirects, "max-redirects", 10, "maximum number of redirects to follow"),
+		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 10, "number of concurrent workers"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",

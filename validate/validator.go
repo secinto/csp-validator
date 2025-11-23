@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	utils "secinto/checkfix_utils"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -175,11 +176,56 @@ func (p *Validator) CheckCSPForHosts() {
 		return
 	}
 
+	// Build list of URLs to validate
+	var urls []string
 	for _, domainWithPort := range domainsWithPorts {
 		if len(domainWithPort) > 0 {
-			p.validateHost("https://" + domainWithPort)
-			p.validateHost("http://" + domainWithPort)
+			urls = append(urls, "https://"+domainWithPort)
+			urls = append(urls, "http://"+domainWithPort)
 		}
+	}
+
+	if len(urls) == 0 {
+		p.logger.Infof("No domains to validate")
+		return
+	}
+
+	p.logger.Infof("Validating %d URLs with %d workers", len(urls), p.options.Concurrency)
+
+	// Create worker pool
+	jobs := make(chan string, len(urls))
+	results := make(chan ValidationResult, len(urls))
+
+	// Start workers
+	var wg sync.WaitGroup
+	for i := 0; i < p.options.Concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for url := range jobs {
+				result := p.validateHostWithResult(url)
+				results <- result
+			}
+		}()
+	}
+
+	// Send jobs
+	go func() {
+		for _, url := range urls {
+			jobs <- url
+		}
+		close(jobs)
+	}()
+
+	// Wait for all workers to finish
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Process results as they come in
+	for result := range results {
+		p.reportResult(result)
 	}
 }
 
@@ -234,4 +280,71 @@ func (p *Validator) validateHost(host string) {
 // ParseURL is a helper function that wraps url.Parse
 func ParseURL(urlStr string) (*url.URL, error) {
 	return url.Parse(urlStr)
+}
+
+// validateHostWithResult validates a host and returns a ValidationResult
+func (p *Validator) validateHostWithResult(host string) ValidationResult {
+	p.logger.Infof("Validating host %s", strings.TrimSpace(host))
+
+	result := ValidationResult{
+		Host: host,
+	}
+
+	// Use injected CSP fetcher
+	csp, body, finalHost, err := p.cspFetcher.FetchCSP(p.httpClient, host, p.options.MaxBodySize, p.options.MaxRedirects, p.logger)
+	if err != nil {
+		result.Error = err
+		return result
+	}
+
+	// Check if CSP was found
+	if len(csp) == 0 {
+		// No CSP found - not an error, just mark as invalid
+		result.Valid = false
+		return result
+	}
+
+	result.CSP = csp
+
+	// Use injected CSP parser
+	policy, err := p.cspParser.Parse(csp, p.logger)
+	if err != nil {
+		p.logger.Errorf("Error during ParsePolicy: %v", err)
+		result.Error = err
+		return result
+	}
+
+	// Parse final URL
+	page, err := ParseURL(finalHost.String())
+	if err != nil {
+		p.logger.Errorf("Error parsing URL: %v", err)
+		result.Error = err
+		return result
+	}
+
+	// Use injected HTML validator
+	valid, reports, err := p.htmlValidator.Validate(policy, *page, strings.NewReader(body))
+	if err != nil {
+		p.logger.Errorf("Error during validating page: %v", err)
+		result.Error = err
+		return result
+	}
+
+	result.Valid = valid
+	result.Reports = reports
+
+	return result
+}
+
+// reportResult reports a ValidationResult using the injected reporter
+func (p *Validator) reportResult(result ValidationResult) {
+	if result.Error != nil {
+		p.reporter.ReportError(result.Host, result.Error)
+	} else if result.CSP == "" {
+		p.reporter.ReportMissing(result.Host)
+	} else if result.Valid {
+		p.reporter.ReportSuccess(result.Host, result.CSP)
+	} else {
+		p.reporter.ReportFailure(result.Host, result.CSP, result.Reports)
+	}
 }
