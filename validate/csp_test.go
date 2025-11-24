@@ -10,14 +10,14 @@ import (
 // mockLogger is a test logger that does nothing
 type mockLogger struct{}
 
-func (m *mockLogger) Tracef(format string, args ...interface{})  {}
-func (m *mockLogger) Debugf(format string, args ...interface{})  {}
-func (m *mockLogger) Infof(format string, args ...interface{})   {}
-func (m *mockLogger) Warnf(format string, args ...interface{})   {}
-func (m *mockLogger) Errorf(format string, args ...interface{})  {}
-func (m *mockLogger) Fatalf(format string, args ...interface{})  {}
-func (m *mockLogger) SetLevel(level interface{})                 {}
-func (m *mockLogger) SetFormatter(formatter interface{})          {}
+func (m *mockLogger) Tracef(format string, args ...interface{}) {}
+func (m *mockLogger) Debugf(format string, args ...interface{}) {}
+func (m *mockLogger) Infof(format string, args ...interface{})  {}
+func (m *mockLogger) Warnf(format string, args ...interface{})  {}
+func (m *mockLogger) Errorf(format string, args ...interface{}) {}
+func (m *mockLogger) Fatalf(format string, args ...interface{}) {}
+func (m *mockLogger) SetLevel(level interface{})                {}
+func (m *mockLogger) SetFormatter(formatter interface{})        {}
 
 func checkErr(t *testing.T, got error, want string) {
 	if got == nil && want == "" {

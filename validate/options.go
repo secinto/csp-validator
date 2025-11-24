@@ -16,28 +16,28 @@ var (
 )
 
 type Options struct {
-	SettingsFile        string
-	Project             string
-	BaseFolder          string
-	LastModified        bool
-	Silent              bool
-	Version             bool
-	NoColor             bool
-	Verbose             bool
-	InsecureSkipVerify  bool
-	MaxBodySize         int64
-	HTTPTimeout         int
-	MaxRedirects        int
-	Concurrency         int
+	SettingsFile       string
+	Project            string
+	BaseFolder         string
+	LastModified       bool
+	Silent             bool
+	Version            bool
+	NoColor            bool
+	Verbose            bool
+	InsecureSkipVerify bool
+	MaxBodySize        int64
+	HTTPTimeout        int
+	MaxRedirects       int
+	Concurrency        int
 }
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{
 		MaxBodySize:  10 * 1024 * 1024, // 10MB default
-		HTTPTimeout:  10,                // 10 seconds default
-		MaxRedirects: 10,                // 10 redirects max
-		Concurrency:  10,                // 10 concurrent workers default
+		HTTPTimeout:  10,               // 10 seconds default
+		MaxRedirects: 10,               // 10 redirects max
+		Concurrency:  10,               // 10 concurrent workers default
 	}
 	var err error
 	flagSet := goflags.NewFlagSet()
