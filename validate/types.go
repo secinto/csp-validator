@@ -13,7 +13,7 @@ const VERSION = "0.1.0"
 
 // Configuration validation errors
 var (
-	ErrInvalidProjectsPath = errors.New("projects_path is empty or invalid")
+	ErrInvalidProjectsPath  = errors.New("projects_path is empty or invalid")
 	ErrProjectsPathNotExist = errors.New("projects_path directory does not exist")
 )
 
@@ -125,39 +125,50 @@ type Report struct {
 	Context       SourceContext
 }
 
-// ValidationResult contains the result of validating a single host
+// ValidationResult contains the result of validating a single host.
+// It is returned by the validateHostWithResult method and collected
+// for aggregation into ValidationSummary.
 type ValidationResult struct {
-	Host    string
-	Valid   bool
-	CSP     string
-	Reports []Report
-	Error   error
+	Host    string   // The URL that was validated
+	Valid   bool     // Whether the CSP policy allows all resources on the page
+	CSP     string   // The CSP policy string that was validated
+	Reports []Report // Detailed violation reports if validation failed
+	Error   error    // Any error encountered during validation
 }
 
 // ValidationSummary contains aggregated validation results and statistics
+// from a batch validation run. It provides counts and detailed breakdowns
+// of successes, failures, errors, and missing CSP policies.
+//
+// The summary is generated after all validations complete and includes
+// percentage calculations for easy interpretation of results.
 type ValidationSummary struct {
-	TotalHosts    int
-	SuccessCount  int
-	FailureCount  int
-	ErrorCount    int
-	MissingCSPCount int
-	CanceledCount int
-	SuccessHosts  []string
-	FailureHosts  []ValidationFailure
-	ErrorHosts    []ValidationError
-	MissingHosts  []string
-	CanceledHosts []string
+	TotalHosts      int                 // Total number of hosts validated
+	SuccessCount    int                 // Number of hosts that passed validation
+	FailureCount    int                 // Number of hosts that failed validation
+	ErrorCount      int                 // Number of hosts that encountered errors
+	MissingCSPCount int                 // Number of hosts without CSP policies
+	CanceledCount   int                 // Number of validations canceled
+	SuccessHosts    []string            // List of successful hosts
+	FailureHosts    []ValidationFailure // Detailed failure information
+	ErrorHosts      []ValidationError   // Detailed error information
+	MissingHosts    []string            // List of hosts without CSP
+	CanceledHosts   []string            // List of canceled validations
 }
 
-// ValidationFailure represents a host that failed CSP validation
+// ValidationFailure represents a host that failed CSP validation.
+// It contains the failing host, its CSP policy, and detailed reports
+// about which resources violated the policy.
 type ValidationFailure struct {
-	Host    string
-	CSP     string
-	Reports []Report
+	Host    string   // The URL that failed validation
+	CSP     string   // The CSP policy that was violated
+	Reports []Report // Detailed violation reports
 }
 
-// ValidationError represents a host that encountered an error during validation
+// ValidationError represents a host that encountered an error during validation.
+// Errors are distinct from validation failures - they indicate that the
+// validation process itself failed (e.g., network errors, parse errors).
 type ValidationError struct {
-	Host  string
-	Error error
+	Host  string // The URL where the error occurred
+	Error error  // The error that occurred
 }
