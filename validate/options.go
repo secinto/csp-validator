@@ -67,30 +67,27 @@ func ParseOptions() *Options {
 		os.Exit(1)
 	}
 
-	options.configureOutput()
-
 	if options.Version {
 		fmt.Printf("Current Version: %s\n", VERSION)
 		os.Exit(0)
 	}
 
-	// Validate the options passed by the user and if any
-	// invalid options have been used, exit.
 	err = options.validateOptions()
 	if err != nil {
-		log.Fatalf("Program exiting: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Program exiting: %v\n", err)
+		os.Exit(1)
 	}
 
 	return options
 }
 
-func (options *Options) configureOutput() {
+func (options *Options) configureOutput(logger Logger) {
 	if options.Verbose {
-		log.SetLevel(logrus.TraceLevel)
+		logger.SetLevel(logrus.TraceLevel)
 	}
 
 	if options.NoColor {
-		log.SetFormatter(&logrus.TextFormatter{
+		logger.SetFormatter(&logrus.TextFormatter{
 			PadLevelText:     true,
 			ForceColors:      false,
 			DisableTimestamp: true,
@@ -98,11 +95,11 @@ func (options *Options) configureOutput() {
 	}
 
 	if options.Silent {
-		log.SetLevel(logrus.PanicLevel)
+		logger.SetLevel(logrus.PanicLevel)
 	}
 
 	if options.InsecureSkipVerify {
-		log.Warnf("WARNING: TLS certificate verification is disabled. This is DANGEROUS and should only be used for testing!")
+		logger.Warnf("WARNING: TLS certificate verification is disabled. This is DANGEROUS and should only be used for testing!")
 	}
 }
 

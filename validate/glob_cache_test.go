@@ -94,8 +94,7 @@ func TestGlobCache_CompileWithDelimiter(t *testing.T) {
 	}
 
 	// Compile same pattern without delimiter - should be separate cache entry
-	g2, err := cache.CompileWithDelimiter(pattern, 0)
-	if err != nil {
+	if _, err := cache.CompileWithDelimiter(pattern, 0); err != nil {
 		t.Fatalf("CompileWithDelimiter() (no delim) error = %v", err)
 	}
 

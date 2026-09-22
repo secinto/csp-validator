@@ -16,9 +16,6 @@ import (
 )
 
 var (
-	defaultSettingsLocation = filepath.Join(os.Getenv("HOME"), ".config/analyzeResponses/settings.yaml")
-
-	// Common errors
 	ErrProjectRequired    = errors.New("project must be specified")
 	ErrValidationCanceled = errors.New("validation was canceled")
 )
@@ -40,6 +37,7 @@ func NewValidatorWithDependencies(
 ) (*Validator, error) {
 	// Create logger instance
 	logger := utils.NewLogger()
+	options.configureOutput(logger)
 
 	validator := &Validator{
 		options:   options,
