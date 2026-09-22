@@ -8,8 +8,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// defaultGlob is pre-compiled at package initialization to avoid runtime panics
+	defaultGlob = mustCompileGlob("*://*")
+)
+
+// mustCompileGlob compiles a glob pattern and panics if it fails.
+// This is only used during package initialization for static patterns.
+func mustCompileGlob(pattern string) glob.Glob {
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		panic("failed to compile static glob pattern: " + pattern + ": " + err.Error())
+	}
+	return g
+}
+
 // ParsePolicy parses all the directives in a CSP policy.
-func ParsePolicy(policy string) (Policy, error) {
+func ParsePolicy(policy string, logger Logger, globCache *GlobCache) (Policy, error) {
 	p := Policy{
 		Directives: map[string]Directive{},
 	}
@@ -23,13 +38,13 @@ func ParsePolicy(policy string) (Policy, error) {
 		directiveType := fields[0]
 		switch directiveType {
 		case "base-uri", "child-src", "connect-src", "default-src", "font-src", "form-action", "frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src":
-			d, err := ParseSourceDirective(fields[1:])
+			d, err := ParseSourceDirective(fields[1:], globCache)
 			if err != nil {
 				return Policy{}, err
 			}
 			p.Directives[directiveType] = d
 		case "script-src-attr", "script-src-elem", "style-src-attr", "style-src-elem", "prefetch-src":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 		case "report-uri":
 			if len(fields) != 2 {
@@ -39,10 +54,10 @@ func ParsePolicy(policy string) (Policy, error) {
 				return Policy{}, err
 			}
 		case "plugin-types", "sandbox", "disown-opener", "navigate-to", "reflected-xss", "referrer", "require-sri-for", "trusted-types", "require-trusted-types-for", "webrtc":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 		case "report-to":
-			log.Debugf("Not handled element found: %s", directiveType)
+			logger.Debugf("Not handled element found: %s", directiveType)
 			continue
 
 		case "upgrade-insecure-requests":
@@ -58,7 +73,7 @@ func ParsePolicy(policy string) (Policy, error) {
 			p.BlockAllMixedContent = true
 
 		default:
-			log.Debugf("Not processed element found: %s", directiveType)
+			logger.Debugf("Not processed element found: %s", directiveType)
 
 			return Policy{}, errors.Errorf("unknown directive %q", directive)
 		}
@@ -85,12 +100,8 @@ func (p Policy) Directive(name string) Directive {
 		return d
 	}
 
-	// If no directives use default policy.
-	g, err := glob.Compile("*://*")
-	if err != nil {
-		panic(err)
-	}
+	// If no directives use default policy (allow all).
 	return SourceDirective{
-		Hosts: []glob.Glob{g},
+		Hosts: []glob.Glob{defaultGlob},
 	}
 }

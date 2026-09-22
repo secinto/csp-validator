@@ -1,16 +1,15 @@
 package validate
 
 import (
+	"context"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
 	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 var (
@@ -136,33 +135,59 @@ func ValidatePage(p Policy, page url.URL, html io.Reader) (bool, []Report, error
 	return len(reports) == 0, reports, nil
 }
 
-// retrieves the current CSP setting from a web page
-func GetCSPFromWeb(webaddress string) (string, string, *url.URL, error) {
-	// create a http client object
-	client := &http.Client{Timeout: 5 * time.Second}
+// GetCSPFromWeb retrieves the current CSP setting from a web page
+func GetCSPFromWeb(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, logger Logger) (string, string, *url.URL, error) {
+	return getCSPFromWebWithDepth(ctx, client, webaddress, maxBodySize, maxRedirects, 0, logger)
+}
 
-	// create a new GET request
-	req, err := http.NewRequest("GET", webaddress, nil)
-	if err != nil {
-		return "", "", nil, errors.New(fmt.Sprintf("Error creating request: %s", err))
+// getCSPFromWebWithDepth is the internal function that tracks redirect depth
+func getCSPFromWebWithDepth(ctx context.Context, client *http.Client, webaddress string, maxBodySize int64, maxRedirects int, depth int, logger Logger) (string, string, *url.URL, error) {
+	// Check if we've exceeded max redirect depth
+	if depth > maxRedirects {
+		return "", "", nil, errors.Errorf("maximum redirect depth (%d) exceeded", maxRedirects)
 	}
 
-	// make the request
+	// Check if context was canceled
+	select {
+	case <-ctx.Done():
+		return "", "", nil, ctx.Err()
+	default:
+	}
+
+	// Create a new GET request with context
+	req, err := http.NewRequestWithContext(ctx, "GET", webaddress, nil)
+	if err != nil {
+		return "", "", nil, errors.Wrap(err, "error creating request")
+	}
+
+	// Make the request
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", nil, errors.New(fmt.Sprintf("Error making request: %s", err))
+		return "", "", nil, errors.Wrap(err, "error making request")
+	}
+	defer resp.Body.Close()
+
+	// Read the response body with size limit to prevent memory exhaustion
+	limitedReader := io.LimitReader(resp.Body, maxBodySize)
+	body, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return "", "", nil, errors.Wrap(err, "error reading response")
 	}
 
-	// read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", nil, errors.New(fmt.Sprintf("Error reading response: %s", err))
+	// Warn if we hit the size limit
+	if int64(len(body)) == maxBodySize {
+		logger.Warnf("Response body truncated at %d bytes for %s", maxBodySize, webaddress)
 	}
-	// print the response body
+
+	// Parse HTML to check for meta refresh redirects
 	doc, err := htmlquery.Parse(strings.NewReader(string(body)))
 	if err != nil {
-		log.Errorf("not a valid XPath expression.")
+		logger.Debugf("Could not parse HTML for redirect detection: %v", err)
+		// Not a fatal error - return what we have
+		return resp.Header.Get("content-security-policy"), string(body), resp.Request.URL, nil
 	}
+
+	// Check for meta refresh redirect
 	elements := htmlquery.Find(doc, "//meta[@http-equiv]")
 	redirect := false
 	redirectUrl := ""
@@ -171,29 +196,31 @@ func GetCSPFromWeb(webaddress string) (string, string, *url.URL, error) {
 			if attributes.Key == "content" {
 				content := strings.Split(attributes.Val, ";")
 				for _, value := range content {
+					value = strings.TrimSpace(value)
 					if strings.HasPrefix(value, "url=") {
-						redirectUrl = strings.Split(value, "url=")[1]
+						redirectUrl = strings.TrimPrefix(value, "url=")
 					}
 				}
 			}
-			if attributes.Key == "http-equiv" && attributes.Val == "refresh" {
+			if attributes.Key == "http-equiv" && strings.ToLower(attributes.Val) == "refresh" {
 				redirect = true
 			}
 		}
 	}
+
 	finalUrl := resp.Request.URL
 	if redirect && len(redirectUrl) > 0 {
 		parsedRedirectUrl, err := url.Parse(redirectUrl)
 		if err != nil {
-			log.Errorf("Couln't parse redirect url %s. Error: %v", redirectUrl, err)
+			logger.Errorf("Couldn't parse redirect url %s. Error: %v", redirectUrl, err)
 			return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
 		}
 		absoluteRedirectUrl := req.URL.ResolveReference(parsedRedirectUrl)
-		log.Debugf("Fetching data from HTML meta redirect to %s", absoluteRedirectUrl.String())
-		return GetCSPFromWeb(absoluteRedirectUrl.String())
-	} else {
-		log.Infof("Final host: %s", finalUrl.String())
+		logger.Debugf("Following HTML meta redirect to %s (depth: %d)", absoluteRedirectUrl.String(), depth+1)
+		// Recursive call with incremented depth and context
+		return getCSPFromWebWithDepth(ctx, client, absoluteRedirectUrl.String(), maxBodySize, maxRedirects, depth+1, logger)
 	}
 
+	logger.Debugf("Final host: %s", finalUrl.String())
 	return resp.Header.Get("content-security-policy"), string(body), finalUrl, nil
 }

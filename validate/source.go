@@ -27,13 +27,13 @@ func (s SourceContext) Report(name string, directive Directive) Report {
 }
 
 // ParseSourceDirective parses a source directive arguments.
-func ParseSourceDirective(sources []string) (SourceDirective, error) {
+func ParseSourceDirective(sources []string, globCache *GlobCache) (SourceDirective, error) {
 	s := SourceDirective{
 		Nonces:  map[string]bool{},
 		Schemes: map[string]bool{},
 	}
 	for _, sDef := range sources {
-		if err := s.ParseSource(sDef); err != nil {
+		if err := s.ParseSource(sDef, globCache); err != nil {
 			return SourceDirective{}, err
 		}
 	}
@@ -111,7 +111,7 @@ func (s HashSource) Check(ctx SourceContext) (bool, error) {
 }
 
 // ParseSource parses a source and adds it to the SourceDirective.
-func (s *SourceDirective) ParseSource(source string) error {
+func (s *SourceDirective) ParseSource(source string, globCache *GlobCache) error {
 	s.ruleCount++
 
 	if strings.HasPrefix(source, "'") && strings.HasSuffix(source, "'") {
@@ -186,7 +186,8 @@ func (s *SourceDirective) ParseSource(source string) error {
 		}
 		if hostSchemeRegex.MatchString(source) {
 			{
-				g, err := glob.Compile(sanitizeGlob(source), '/')
+				pattern := sanitizeGlob(source)
+				g, err := globCache.CompileWithDelimiter(pattern, '/')
 				if err != nil {
 					return err
 				}
@@ -194,7 +195,8 @@ func (s *SourceDirective) ParseSource(source string) error {
 				s.SrcHosts = append(s.SrcHosts, source)
 			}
 			{
-				g, err := glob.Compile("*://"+sanitizeGlob(source), '/')
+				pattern := "*://" + sanitizeGlob(source)
+				g, err := globCache.CompileWithDelimiter(pattern, '/')
 				if err != nil {
 					return err
 				}
