@@ -15,8 +15,6 @@ import (
 )
 
 var (
-	defaultSettingsLocation = filepath.Join(os.Getenv("HOME"), ".config/analyzeResponses/settings.yaml")
-
 	// Common errors
 	ErrProjectRequired    = errors.New("project must be specified")
 	ErrValidationCanceled = errors.New("validation was canceled")

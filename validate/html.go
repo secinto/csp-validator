@@ -2,7 +2,6 @@ package validate
 
 import (
 	"context"
-	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
 	"github.com/pkg/errors"

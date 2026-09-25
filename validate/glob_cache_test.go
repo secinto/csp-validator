@@ -99,6 +99,10 @@ func TestGlobCache_CompileWithDelimiter(t *testing.T) {
 		t.Fatalf("CompileWithDelimiter() (no delim) error = %v", err)
 	}
 
+	if g2 == nil {
+		t.Errorf("CompileWithDelimiter() (no delimiter) returned nil glob")
+	}
+
 	// Should have 2 cache entries
 	if cache.Size() != 2 {
 		t.Errorf("cache.Size() = %d; want 2 (different delimiters)", cache.Size())
