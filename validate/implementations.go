@@ -2,11 +2,13 @@ package validate
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
-	utils "secinto/checkfix_utils"
+	"strings"
 )
 
 // DefaultCSPFetcher is the default implementation of CSPFetcher
@@ -46,9 +48,26 @@ type FileDomainSource struct {
 	FilePath string
 }
 
-// GetDomains implements DomainSource interface
+// GetDomains implements DomainSource interface.
+//
+// It reads the domains file line by line, trims surrounding whitespace
+// (including CR from CRLF files) and skips empty lines. A missing or
+// unreadable file is returned as an error instead of being reported as
+// "no domains to validate".
 func (s *FileDomainSource) GetDomains() ([]string, error) {
-	return utils.ReadPlainTextFileByLines(s.FilePath), nil
+	data, err := os.ReadFile(s.FilePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read domains file %s: %w", s.FilePath, err)
+	}
+
+	var domains []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			domains = append(domains, line)
+		}
+	}
+	return domains, nil
 }
 
 // LoggerReporter uses a logger to report validation results

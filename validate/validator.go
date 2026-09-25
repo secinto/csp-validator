@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	utils "secinto/checkfix_utils"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +38,7 @@ func NewValidatorWithDependencies(
 	reporter Reporter,
 ) (*Validator, error) {
 	// Create logger instance
-	logger := utils.NewLogger()
+	logger := NewLogger()
 
 	validator := &Validator{
 		options:   options,
