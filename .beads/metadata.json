@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "csp_validator",
+  "project_id": "d78710c8-5fa1-4e74-b685-85dfffd55db4"
+}
