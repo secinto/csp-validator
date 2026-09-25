@@ -443,9 +443,9 @@ func (p *Validator) generateSummary(results []ValidationResult) ValidationSummar
 
 // logSummary logs a ValidationSummary
 func (p *Validator) logSummary(summary ValidationSummary) {
-	p.logger.Infof("=" + strings.Repeat("=", 78))
+	p.logger.Infof("%s", "="+strings.Repeat("=", 78))
 	p.logger.Infof("VALIDATION SUMMARY")
-	p.logger.Infof("=" + strings.Repeat("=", 78))
+	p.logger.Infof("%s", "="+strings.Repeat("=", 78))
 	p.logger.Infof("Total Hosts:       %d", summary.TotalHosts)
 	p.logger.Infof("Success:           %d (%.1f%%)", summary.SuccessCount, percentage(summary.SuccessCount, summary.TotalHosts))
 	p.logger.Infof("Failures:          %d (%.1f%%)", summary.FailureCount, percentage(summary.FailureCount, summary.TotalHosts))
@@ -456,7 +456,7 @@ func (p *Validator) logSummary(summary ValidationSummary) {
 		p.logger.Infof("Canceled:          %d (%.1f%%)", summary.CanceledCount, percentage(summary.CanceledCount, summary.TotalHosts))
 	}
 
-	p.logger.Infof("=" + strings.Repeat("=", 78))
+	p.logger.Infof("%s", "="+strings.Repeat("=", 78))
 
 	// Log details for failures if verbose mode is enabled
 	if p.options.Verbose && len(summary.FailureHosts) > 0 {

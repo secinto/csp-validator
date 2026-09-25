@@ -43,12 +43,8 @@ jobs:
           args: ./...
 
   vulncheck:
-    name: govulncheck (advisory)
+    name: govulncheck
     runs-on: ubuntu-latest
-    # Advisory for now: govulncheck currently reports known findings
-    # (golang.org/x/net, mholt/archiver, toolchain). Promote this to a
-    # blocking job as part of bead csp-validator-dep-vulns.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

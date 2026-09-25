@@ -40,7 +40,7 @@ tidy: ## verify go.mod / go.sum are tidy (fails on drift)
 	$(GO) mod tidy
 	@git diff --quiet -- go.mod go.sum || { echo "go.mod/go.sum changed; commit the result"; exit 1; }
 
-vuln: ## run govulncheck (advisory until csp-validator-dep-vulns is closed)
+vuln: ## run govulncheck
 	$(GO) run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 ci: fmt-check build vet lint cover ## everything the CI pipeline runs
