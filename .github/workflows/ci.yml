@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: format, build, vet, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "gofmt would rewrite:"; echo "$out"; exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Test (race + coverage)
+        run: go test -race -cover ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          args: ./...
+
+  vulncheck:
+    name: govulncheck (advisory)
+    runs-on: ubuntu-latest
+    # Advisory for now: govulncheck currently reports known findings
+    # (golang.org/x/net, mholt/archiver, toolchain). Promote this to a
+    # blocking job as part of bead csp-validator-dep-vulns.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

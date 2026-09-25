@@ -1,0 +1,54 @@
+# golangci-lint configuration for csp-validator.
+# Linter set is the one agreed in Beads issue csp-validator-add-ci.
+#
+# Two findings are deliberately excluded because they are tracked as their own
+# beads; drop the exclusions as those beads close:
+#   - `unused` on validate/validator.go  -> csp-validator-fn-dead-code
+#   - `gosec` G402 on validate/validator.go -> csp-validator-sec-tls-flag-hygiene
+version: "2"
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - errcheck
+    - gosec
+    - govet
+    - ineffassign
+    - noctx
+    - prealloc
+    - staticcheck
+    - unused
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Dead code, tracked in csp-validator-fn-dead-code.
+      - linters:
+          - unused
+        path: validate/validator.go
+        text: 'func \(\*Validator\)\.validateHost is unused'
+
+      # InsecureSkipVerify is opt-in and defaults to false; the warning and the
+      # annotation belong to csp-validator-sec-tls-flag-hygiene.
+      - linters:
+          - gosec
+        path: validate/validator.go
+        text: G402
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

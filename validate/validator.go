@@ -98,8 +98,8 @@ func (p *Validator) initialize(configLocation string) error {
 	// Use filepath.Join for proper path handling
 	p.options.BaseFolder = filepath.Join(p.config.ProjectsPath, p.options.Project)
 
-	p.config.DpuxFile = strings.Replace(p.config.DpuxFile, "{project_name}", p.options.Project, -1)
-	p.config.PortsXMLFile = strings.Replace(p.config.PortsXMLFile, "{project_name}", p.options.Project, -1)
+	p.config.DpuxFile = strings.ReplaceAll(p.config.DpuxFile, "{project_name}", p.options.Project)
+	p.config.PortsXMLFile = strings.ReplaceAll(p.config.PortsXMLFile, "{project_name}", p.options.Project)
 
 	// Create HTTP client with configurable TLS and timeout settings
 	p.httpClient = &http.Client{
